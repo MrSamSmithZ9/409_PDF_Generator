@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,12 +11,13 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Globalization;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using Path = System.IO.Path;
 
 namespace _409_PDF_Generator
-{   
+{
     public partial class Form1 : Form
     {
         private string rootFolder;
@@ -63,7 +65,10 @@ namespace _409_PDF_Generator
                         monthYear = "Unknown";
                     }
 
-                    var pdfItem = new PdfItem(Path.GetFileName(f), f, monthYear);
+                    // detect hodr token in filename (D, M01, W01, Y, Q, etc.)
+                    var hodrToken = GethodrTokenFromFilename(Path.GetFileName(f));
+
+                    var pdfItem = new PdfItem(Path.GetFileName(f), f, monthYear, hodrToken);
                     var group = ClassifyPdfByFilename(f);
 
                     switch (group)
@@ -240,12 +245,110 @@ namespace _409_PDF_Generator
             }
         }
 
+        // Owner-draw handler: draws checkbox + colored text based on hodr token
+        private void checkedListBox_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            var clb = sender as CheckedListBox;
+            if (clb == null || e.Index < 0) return;
+
+            var item = clb.Items[e.Index] as PdfItem;
+            string text = item?.ToString() ?? clb.Items[e.Index].ToString();
+
+            // Determine color from hodr token
+            Color foreColor = clb.ForeColor;
+            if (item != null && !string.IsNullOrEmpty(item.hodrToken))
+            {
+                switch (item.hodrToken.ToUpperInvariant())
+                {
+                    case "D":
+                        foreColor = Color.Green;
+                        break;
+                    case "M01":
+                        foreColor = Color.Blue;
+                        break;
+                    case "W01":
+                        foreColor = Color.Orange;
+                        break;
+                    case "Y":
+                        foreColor = Color.Red;
+                        break;
+                    case "Q":
+                        foreColor = Color.HotPink;
+                        break;
+                }
+            }
+
+            e.DrawBackground();
+
+            bool isChecked = clb.GetItemChecked(e.Index);
+
+            // Draw checkbox
+            int cbSize = 14;
+            var cbRect = new Rectangle(e.Bounds.X + 2, e.Bounds.Y + (e.Bounds.Height - cbSize) / 2, cbSize, cbSize);
+            CheckBoxState cbState = isChecked ? CheckBoxState.CheckedNormal : CheckBoxState.UncheckedNormal;
+            try
+            {
+                CheckBoxRenderer.DrawCheckBox(e.Graphics, new Point(cbRect.X, cbRect.Y), cbState);
+            }
+            catch
+            {
+                // fallback simple rectangle
+                using (var pen = new Pen(Color.Black))
+                    e.Graphics.DrawRectangle(pen, cbRect);
+            }
+
+            // Draw text
+            var textRect = new Rectangle(cbRect.Right + 4, e.Bounds.Y, e.Bounds.Width - cbRect.Width - 6, e.Bounds.Height);
+            TextRenderer.DrawText(e.Graphics, text, e.Font, textRect, foreColor, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+
+            e.DrawFocusRectangle();
+        }
+
+        // detect token immediately following "hodr" in the filename (case-insensitive)
+        // returns normalized token (uppercase), e.g. "D", "M01", "W01", "Y", "Q" or null if none
+        private string GethodrTokenFromFilename(string filename)
+        {
+            if (string.IsNullOrWhiteSpace(filename)) return null;
+            var name = Path.GetFileNameWithoutExtension(filename).ToLowerInvariant();
+
+            // check for known tokens immediately after "hodr"
+            // pattern: hodr possibly followed by punctuation/spaces, then token
+            var m = Regex.Match(name, @"hodr[_\-\s]*?(?<tok>(m01|w01|d|y|q))", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (m.Success)
+                return m.Groups["tok"].Value.ToUpperInvariant();
+            else
+            {
+                Debug.WriteLine("No hodr token found in filename: " + filename);
+            }
+
+                // last-resort: if filename contains "hodr" and token appears anywhere after it, try finding the token substring index-wise
+                var idx = name.IndexOf("hodr", StringComparison.InvariantCultureIgnoreCase);
+            if (idx >= 0)
+            {
+                Debug.WriteLine("Running hodr Failsafe for filename: " + filename);
+                var tail = name.Substring(idx + 5); // after "hodr"
+                // look for the known tokens at start of tail
+                var known = new[] { "m01", "w01", "d", "y", "q" };
+                foreach (var k in known)
+                {
+                    if (tail.StartsWith(k, StringComparison.InvariantCultureIgnoreCase))
+                        return k.ToUpperInvariant();
+                }
+            }
+
+            return null;
+        }
+
         // Classify based strictly on filename (no folder/path tokens).
-        // Uses whole-word matching via regex to reduce accidental matches.
+        // Shotgun detection is checked before Station to ensure shotgun files are not misclassified as Station.
         private PdfGroup ClassifyPdfByFilename(string fullPath)
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(fullPath) ?? "";
             var normalized = name.ToLowerInvariant();
+
+            // Ensure shotgun is checked first so filenames containing "shotgun" won't fall into Station
+            if (MatchesAny(normalized, "shotgun gate", "shotgun", "shot-gun", "shot gun", "shotgun_gate", "sg_gate", "sg"))
+                return PdfGroup.ShotgunGate;
 
             // Check in order of specificity to avoid accidental overlaps.
             if (MatchesAny(normalized, "ride track", "ridetrack", "ride-track", "ride", "track"))
@@ -256,9 +359,6 @@ namespace _409_PDF_Generator
 
             if (MatchesAny(normalized, "lsm"))
                 return PdfGroup.LSM;
-
-            if (MatchesAny(normalized, "shotgun gate", "shotgun", "shot-gun", "shot gun", "shotgun_gate", "sg_gate", "sg"))
-                return PdfGroup.ShotgunGate;
 
             if (MatchesAny(normalized, "train", "trn"))
                 return PdfGroup.Train;
@@ -400,12 +500,14 @@ namespace _409_PDF_Generator
             public string Name { get; }
             public string FullPath { get; }
             public string MonthYear { get; }
+            public string hodrToken { get; }
 
-            public PdfItem(string name, string fullPath, string monthYear)
+            public PdfItem(string name, string fullPath, string monthYear, string hodrToken)
             {
                 Name = name;
                 FullPath = fullPath;
                 MonthYear = string.IsNullOrWhiteSpace(monthYear) ? "Unknown" : monthYear;
+                hodrToken = string.IsNullOrWhiteSpace(hodrToken) ? null : hodrToken.ToUpperInvariant();
             }
 
             public override string ToString()
