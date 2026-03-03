@@ -1,19 +1,20 @@
 ﻿using _409_PDF_Generator;
+using iText.Kernel.Pdf;
+using iText.Kernel.Pdf.Canvas.Parser;
+using iText.Kernel.Utils;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Globalization;
 using System.Windows.Forms;
-using iText.Kernel.Pdf;
-using iText.Kernel.Pdf.Canvas.Parser;
-using iText.Kernel.Utils;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using Path = System.IO.Path;
 
 namespace _409_PDF_Generator
@@ -28,9 +29,11 @@ namespace _409_PDF_Generator
             InitializeComponent();
 
             // Attach single-click handler so a single click immediately sends the item to the print queue.
-            // Include the new Daily list
+            // Include the new Daily / Weekly / Monthly lists
             listBox_RideTrack.Click += listBox_ItemClick;
-            listBox_Daily.Click += listBox_ItemClick; // NEW
+            listBox_Daily.Click += listBox_ItemClick;
+            listBox_Weekly.Click += listBox_ItemClick;   // NEW
+            listBox_Monthly.Click += listBox_ItemClick;  // NEW
             listBox_Station.Click += listBox_ItemClick;
             listBox_LSM.Click += listBox_ItemClick;
             listBox_ShotgunGate.Click += listBox_ItemClick;
@@ -51,6 +54,8 @@ namespace _409_PDF_Generator
             // Clear all lists
             listBox_RideTrack.Items.Clear();
             listBox_Daily.Items.Clear();
+            listBox_Weekly.Items.Clear();   // NEW
+            listBox_Monthly.Items.Clear();  // NEW
             listBox_Station.Items.Clear();
             listBox_LSM.Items.Clear();
             listBox_ShotgunGate.Items.Clear();
@@ -90,6 +95,16 @@ namespace _409_PDF_Generator
                         listBox_Daily.Items.Add(pdfItem);
                     }
 
+                    // NEW: add weekly & monthly based on tokens
+                    if (string.Equals(pdfItem.HodrToken, "W01", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        listBox_Weekly.Items.Add(pdfItem);
+                    }
+                    if (string.Equals(pdfItem.HodrToken, "M01", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        listBox_Monthly.Items.Add(pdfItem);
+                    }
+
                     switch (group)
                     {
                         case PdfGroup.RideTrack:
@@ -124,7 +139,7 @@ namespace _409_PDF_Generator
             RefreshPdfList();
         }
 
-        // Collect selected file paths from all group lists (include Daily)
+        // Collect selected file paths from all group lists (include Daily, Weekly, Monthly)
         private IEnumerable<string> GetSelectedFilePaths()
         {
             foreach (var obj in listBox_RideTrack.SelectedItems)
@@ -132,6 +147,12 @@ namespace _409_PDF_Generator
 
             foreach (var obj in listBox_Daily.SelectedItems)
                 if (obj is PdfItem pDaily) yield return pDaily.FullPath;
+
+            foreach (var obj in listBox_Weekly.SelectedItems) // NEW
+                if (obj is PdfItem pWeekly) yield return pWeekly.FullPath;
+
+            foreach (var obj in listBox_Monthly.SelectedItems) // NEW
+                if (obj is PdfItem pMonthly) yield return pMonthly.FullPath;
 
             foreach (var obj in listBox_Station.SelectedItems)
                 if (obj is PdfItem p2) yield return p2.FullPath;
@@ -171,7 +192,7 @@ namespace _409_PDF_Generator
             }
         }
 
-        // Add selected items from all groups to the print queue (include Daily)
+        // Add selected items from all groups to the print queue (include Daily, Weekly, Monthly)
         private void btnAddToQueue_Click(object sender, EventArgs e)
         {
             var added = 0;
@@ -191,6 +212,8 @@ namespace _409_PDF_Generator
 
             addFromList(listBox_RideTrack);
             addFromList(listBox_Daily);
+            addFromList(listBox_Weekly);   // NEW
+            addFromList(listBox_Monthly);  // NEW
             addFromList(listBox_Station);
             addFromList(listBox_LSM);
             addFromList(listBox_ShotgunGate);
@@ -328,46 +351,103 @@ namespace _409_PDF_Generator
                     {
                         try
                         {
-                            //-- Add Single --
-                            using (var reader = new PdfReader(src))
-                            {
-                                reader.SetUnethicalReading(true); // allow merging of protected PDFs if necessary                     
-                                using (var pdfSrc = new PdfDocument(reader))
-                                {
-                                    merger.Merge(pdfSrc, 1, pdfSrc.GetNumberOfPages());
-                                }
-                            }
+
 
                             //-- Process Duplicates ---
                             if (src.Contains("BOGIE"))
                             {
                                 runSingle = false;
-                                var duplicates = PrepareDuplicatePaths(src, (int)(bogieNumber_box.Value-1)*(int)(trainNumber_box.Value), out var createdTemps);
+                                var duplicates = PrepareDuplicatePaths(src, (int)(bogieNumber_box.Value) * (int)(trainNumber_box.Value), out var createdTemps);
                                 duplicateMerge(merger, duplicates);
                             }
+                            else
+                            if (src.Contains("CHASSIS"))
+                            {
+                                runSingle = false;
+                                var duplicates = PrepareDuplicatePaths(src, (int)(chassisNumber.Value) * (int)(trainNumber_box.Value), out var createdTemps);
+                                duplicateMerge(merger, duplicates);
+                            }
+                            else
+                            if (src.Contains("COUPLING"))
+                            {
+                                runSingle = false;
+                                var duplicates = PrepareDuplicatePaths(src, (int)(couplingNumber.Value) * (int)(trainNumber_box.Value), out var createdTemps);
+                                duplicateMerge(merger, duplicates);
+                            }
+                            else
                             if (src.Contains("RESTRAINT"))
                             {
                                 runSingle = false;
-                                var duplicates = PrepareDuplicatePaths(src, (int)(bogieNumber_box.Value - 1) * (int)(trainNumber_box.Value), out var createdTemps);
+                                var duplicates = PrepareDuplicatePaths(src, (int)(bogieNumber_box.Value) * (int)(trainNumber_box.Value), out var createdTemps);
                                 duplicateMerge(merger, duplicates);
                             }
+                            else
                             if (src.Contains("TRAIN CABIN"))
                             {
                                 runSingle = false;
-                                var duplicates = PrepareDuplicatePaths(src, (int)trainNumber_box.Value - 1, out var createdTemps);
+                                var duplicates = PrepareDuplicatePaths(src, (int)trainNumber_box.Value, out var createdTemps);
                                 duplicateMerge(merger, duplicates);
                             }
+                            else
                             if (src.Contains("SWITCHES"))
                             {
                                 runSingle = false;
-                                var duplicates = PrepareDuplicatePaths(src, (int)switchNumber_box.Value - 1, out var createdTemps);
+                                var duplicates = PrepareDuplicatePaths(src, 5, out var createdTemps);
                                 duplicateMerge(merger, duplicates);
                             }
+                            else
+                            if (src.Contains("SHOTGUN") && src.Contains("LOAD"))
+                            {
+                                runSingle = false;
+                                var duplicates = PrepareDuplicatePaths(src, (int)loadNumber.Value, out var createdTemps);
+                                duplicateMerge(merger, duplicates);
+                            }
+                            else
+                            if (src.Contains("SHOTGUN") && src.Contains("UNLOAD")) 
+                            {
+                                runSingle = false;
+                                var duplicates = PrepareDuplicatePaths(src, (int)unloadNumber.Value, out var createdTemps);
+                                duplicateMerge(merger, duplicates);
+                            }
+                            else
+                            if (src.Contains("STATION EXIT"))
+                            {
+                                runSingle = false;
+                                var duplicates = PrepareDuplicatePaths(src, (int)exitNumber.Value, out var createdTemps);
+                                duplicateMerge(merger, duplicates);
+                            }
+                            else
+                            if (src.Contains("STATION WAITING"))
+                            {
+                                runSingle = false;
+                                var duplicates = PrepareDuplicatePaths(src, (int)waitingNumber.Value, out var createdTemps);
+                                duplicateMerge(merger, duplicates);
+                            }
+                            else
+                            if (src.Contains("STATION"))
+                            {
+                                runSingle = false;
+                                var duplicates = PrepareDuplicatePaths(src, (int)stationNumber.Value, out var createdTemps);
+                                duplicateMerge(merger, duplicates);
+                            }
+                            else
                             if (src.Contains("2 OR 4"))
                             {
                                 runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, 2, out var createdTemps);
                                 duplicateMerge(merger, duplicates);
+                            }
+                            else
+                            {
+                                //-- Add Single --
+                                using (var reader = new PdfReader(src))
+                                {
+                                    reader.SetUnethicalReading(true); // allow merging of protected PDFs if necessary                     
+                                    using (var pdfSrc = new PdfDocument(reader))
+                                    {
+                                        merger.Merge(pdfSrc, 1, pdfSrc.GetNumberOfPages());
+                                    }
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -391,6 +471,40 @@ namespace _409_PDF_Generator
             return null;
         }
 
+        private void numberDuplicates(PdfDocument pdfDest, int x, int y, string text)
+        {
+
+            try
+            {
+                var font = iText.Kernel.Font.PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
+
+                var page = pdfDest.GetPage(1);
+
+                var rect = page.GetPageSize();
+                var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+
+                // Correct Canvas ctor: (PdfCanvas, Rectangle)
+                using (var canvas = new iText.Layout.Canvas(pdfCanvas, rect))
+                {
+                    canvas.SetFont(font).SetFontSize(9);
+
+                    // Position: top-right with small margin
+                    float xPos = rect.GetRight() - 36;
+                    float yPos = rect.GetTop() - 18;
+
+                    canvas.ShowTextAligned(
+                        new iText.Layout.Element.Paragraph(text),
+                        xPos, yPos,
+                        iText.Layout.Properties.TextAlignment.RIGHT);
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("StampTextOnPages error: " + ex.Message);
+            }
+        }
+
         private void duplicateMerge(PdfMerger pm, List<string> dupes)
         {
             foreach (var src in dupes)
@@ -400,7 +514,8 @@ namespace _409_PDF_Generator
 
                     using (var reader = new PdfReader(src))
                     {
-                        reader.SetUnethicalReading(true); // allow merging of protected PDFs if necessary                     
+                        reader.SetUnethicalReading(true); // allow merging of protected PDFs if necessary
+
                         using (var pdfSrc = new PdfDocument(reader))
                         {
                             pm.Merge(pdfSrc, 1, pdfSrc.GetNumberOfPages());
@@ -428,10 +543,10 @@ namespace _409_PDF_Generator
             if (string.IsNullOrWhiteSpace(original) || !File.Exists(original)) return result;
 
             // Always include the original
-            result.Add(original);
+            //result.Add(original);
 
             // Create extra copies if requested
-            for (int i = 1; i < copiesPerFile; i++)
+            for (int i = 0; i < copiesPerFile; i++)
             {
                 try
                 {
@@ -624,7 +739,7 @@ namespace _409_PDF_Generator
                 return PdfGroup.ShotgunGate;
 
             // Check in order of specificity to avoid accidental overlaps.
-            if (MatchesAny(normalized, "ride track", "ridetrack", "ride-track", "ride", "track"))
+            if (MatchesAny(normalized, "ride track", "ridetrack", "ride-track", "ride", "track", "block", "switches"))
                 return PdfGroup.RideTrack;
         
             if (MatchesAny(normalized, "station", "sta", "stn"))
@@ -633,7 +748,7 @@ namespace _409_PDF_Generator
             if (MatchesAny(normalized, "lsm"))
                 return PdfGroup.LSM;
 
-            if (MatchesAny(normalized, "train", "trn"))
+            if (MatchesAny(normalized, "train", "trn", "bogie", "chassis", "frp", "seat", "tow", "ada"))
                 return PdfGroup.Train;
 
             return PdfGroup.Other;
@@ -824,6 +939,11 @@ namespace _409_PDF_Generator
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             CleanupTempCopies(generatedPDFs);
+        }
+
+        private void switchNumber_label_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
