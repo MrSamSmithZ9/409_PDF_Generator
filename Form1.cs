@@ -2,6 +2,8 @@
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using iText.Kernel.Utils;
+using iText.Signatures;
+using iTextSharp.text.pdf.codec;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -345,107 +347,93 @@ namespace _409_PDF_Generator
                 using (var pdfDest = new PdfDocument(writer))
                 {
                     var merger = new PdfMerger(pdfDest);
-                    bool runSingle = true;
 
                     foreach (var src in list)
                     {
                         try
                         {
-
-
-                            //-- Process Duplicates ---
-                            if (src.Contains("BOGIE"))
+                            //-- Process Duplicates (unchanged semantics in your app) ---
+                            if (src.IndexOf("BOGIE", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)(bogieNumber_box.Value) * (int)(trainNumber_box.Value), out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("CHASSIS"))
+                            else if (src.IndexOf("CHASSIS", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)(chassisNumber.Value) * (int)(trainNumber_box.Value), out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("COUPLING"))
+                            else if (src.IndexOf("COUPLING", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)(couplingNumber.Value) * (int)(trainNumber_box.Value), out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("RESTRAINT"))
+                            else if (src.IndexOf("RESTRAINT", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)(bogieNumber_box.Value) * (int)(trainNumber_box.Value), out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("TRAIN CABIN"))
+                            else if (src.IndexOf("TRAIN CABIN", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)trainNumber_box.Value, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("SWITCHES"))
+                            else if (src.IndexOf("SWITCHES", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, 5, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("SHOTGUN") && src.Contains("LOAD"))
+                            else if (src.IndexOf("SHOTGUN", StringComparison.InvariantCultureIgnoreCase) >= 0 && src.IndexOf("LOAD", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)loadNumber.Value, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("SHOTGUN") && src.Contains("UNLOAD")) 
+                            else if (src.IndexOf("SHOTGUN", StringComparison.InvariantCultureIgnoreCase) >= 0 && src.IndexOf("UNLOAD", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)unloadNumber.Value, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("STATION EXIT"))
+                            else if (src.IndexOf("STATION EXIT", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)exitNumber.Value, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("STATION WAITING"))
+                            else if (src.IndexOf("STATION WAITING", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)waitingNumber.Value, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("STATION"))
+                            else if (src.IndexOf("STATION", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, (int)stationNumber.Value, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
-                            else
-                            if (src.Contains("2 OR 4"))
+                            else if (src.IndexOf("2 OR 4", StringComparison.InvariantCultureIgnoreCase) >= 0)
                             {
-                                runSingle = false;
                                 var duplicates = PrepareDuplicatePaths(src, 2, out var createdTemps);
-                                duplicateMerge(merger, duplicates);
+                                duplicateMerge(merger, pdfDest, duplicates);
                             }
                             else
                             {
-                                //-- Add Single --
+                                //-- Add Single and add blank page if source has odd pages --
                                 using (var reader = new PdfReader(src))
                                 {
-                                    reader.SetUnethicalReading(true); // allow merging of protected PDFs if necessary                     
+                                    reader.SetUnethicalReading(true); // allow merging of protected PDFs if necessary
                                     using (var pdfSrc = new PdfDocument(reader))
                                     {
-                                        merger.Merge(pdfSrc, 1, pdfSrc.GetNumberOfPages());
+                                        int srcPages = pdfSrc.GetNumberOfPages();
+                                        // capture page size of last page so inserted blank matches source
+                                        var lastPageSize = pdfSrc.GetPage(srcPages).GetPageSize();
+
+                                        int before = pdfDest.GetNumberOfPages();
+                                        merger.Merge(pdfSrc, 1, srcPages);
+                                        int after = pdfDest.GetNumberOfPages();
+
+                                        // If source had odd number of pages, add a blank page (same size) to destination
+                                        if ((srcPages % 2) == 1)
+                                        {
+                                            pdfDest.AddNewPage();
+                                        }
                                     }
                                 }
                             }
@@ -471,63 +459,40 @@ namespace _409_PDF_Generator
             return null;
         }
 
-        private void numberDuplicates(PdfDocument pdfDest, int x, int y, string text)
+        private void duplicateMerge(PdfMerger pm, PdfDocument pdfDest, List<string> dupes)
         {
+            if (dupes == null || dupes.Count == 0) return;
 
-            try
-            {
-                var font = iText.Kernel.Font.PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
-
-                var page = pdfDest.GetPage(1);
-
-                var rect = page.GetPageSize();
-                var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
-
-                // Correct Canvas ctor: (PdfCanvas, Rectangle)
-                using (var canvas = new iText.Layout.Canvas(pdfCanvas, rect))
-                {
-                    canvas.SetFont(font).SetFontSize(9);
-
-                    // Position: top-right with small margin
-                    float xPos = rect.GetRight() - 36;
-                    float yPos = rect.GetTop() - 18;
-
-                    canvas.ShowTextAligned(
-                        new iText.Layout.Element.Paragraph(text),
-                        xPos, yPos,
-                        iText.Layout.Properties.TextAlignment.RIGHT);
-                }
-                
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("StampTextOnPages error: " + ex.Message);
-            }
-        }
-
-        private void duplicateMerge(PdfMerger pm, List<string> dupes)
-        {
             foreach (var src in dupes)
             {
                 try
                 {
-
                     using (var reader = new PdfReader(src))
                     {
-                        reader.SetUnethicalReading(true); // allow merging of protected PDFs if necessary
-
+                        reader.SetUnethicalReading(true);
                         using (var pdfSrc = new PdfDocument(reader))
                         {
-                            pm.Merge(pdfSrc, 1, pdfSrc.GetNumberOfPages());
+                            int srcPages = pdfSrc.GetNumberOfPages();
+                            var lastPageSize = pdfSrc.GetPage(srcPages).GetPageSize();
+
+                            int before = pdfDest.GetNumberOfPages();
+                            pm.Merge(pdfSrc, 1, srcPages);
+                            int after = pdfDest.GetNumberOfPages();
+
+                            // insert blank page if source had odd pages
+                            if ((srcPages % 2) == 1)
+                            {
+                                pdfDest.AddNewPage();
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    // If a specific source fails, continue with others but log/display
-                    Debug.WriteLine($"Failed to merge '{src}': {ex.Message}");
+                    Debug.WriteLine($"Failed to merge duplicate '{src}': {ex.Message}");
                 }
             }
+
             CleanupTempCopies(dupes);
         }
 
